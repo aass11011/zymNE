@@ -6,7 +6,8 @@
 '''
 import tensorflow as tf
 import numpy as np
-
+import random
+import math
 
 __author__ = "Wang Binlu"
 __email__ = "wblmail@whu.edu.cn"
@@ -63,6 +64,12 @@ class SDNE(object):
         self.adj_mat = self.getAdj()
         self.embeddings = self.train()
 
+        ##############  k-means  ######################
+
+        self.centroids = []
+        self.clusterAssment = None
+        self.communities = {}
+        ##############  k-means  ######################
         look_back = self.g.look_back_list
 
         for i, embedding in enumerate(self.embeddings):
@@ -158,6 +165,49 @@ class SDNE(object):
         fout.write("{} {}\n".format(node_num, self.dim))
         for node, vec in self.vectors.items():
             fout.write("{} {}\n".format(node, ' '.join([str(x) for x in vec])))
+        fout.close()
+
+
+    def k_means(self,k):
+        numSamples = self.embeddings.shape[0]
+        self.clusterAssment = np.mat(np.zeros((numSamples,2),dtype = np.int))
+        clusterChange = True
+        self.initCentroids(k)
+        look_back = self.g.look_back_list
+        while clusterChange:
+            clusterChange = False
+            for i in  range(numSamples):
+                minDist = 100000.0
+                minIndex = 0
+                for j in range(k):
+                    distance = np.sqrt(np.sum(np.power((self.embeddings[i]-self.centroids[j]),2)))
+                    if distance < minDist:
+                        minIndex = j
+                        minDist = distance
+                if self.clusterAssment[i,0] != minIndex:
+                    clusterChange = True
+                    self.clusterAssment[i,:] = minIndex,minDist**2
+            for j in range(k):
+                pointInCluster = self.embeddings[np.nonzero(self.clusterAssment[:,0].A == j)[0]]
+                self.centroids[j,:] = np.mean(pointInCluster,axis=0)
+        for i in range(k):
+            comms = []
+            for index in np.nonzero(self.clusterAssment[:,0].A == i)[0]:
+                comms.append(look_back[index])
+            self.communities[i] = comms
+    def initCentroids(self,k):
+        numSample,dim = np.shape(self.embeddings)
+        self.centroids = np.ones((k,dim),dtype=np.float)
+        for i in range(k):
+            index = int(random.uniform(0,numSample))
+            self.centroids[i,:] = self.embeddings[index,:]
+
+    def save_kmeans(self,filename):
+        fout = open(filename,'w')
+        clusters = self.communities
+        fout.write("number of clusters:{} \n".format(len(clusters)))
+        for com,nodes in clusters.items():
+            fout.write("{} {}\n".format(com,' '.join([str(x) for x in nodes])))
         fout.close()
 
 
@@ -311,3 +361,7 @@ class SDNE2(object):
         for node, vec in self.vectors.items():
             fout.write("{} {}\n".format(node, ' '.join([str(x) for x in vec])))
         fout.close()
+
+
+
+

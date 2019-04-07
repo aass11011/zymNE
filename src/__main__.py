@@ -17,7 +17,7 @@ def main():
     t1 = time.time()
     g = graph.Graph()
     print("Reading...")
-    input = "E://PYTHONGRAM//zymNE//data//blogCatalog//bc_adjlist.txt"
+    input = "E://PYGRAM//zymNE//data//blogCatalog//bc_adjlist.txt"
     graph_format = "adjlist"
     encoder_layer_list = ast.literal_eval('[1000, 128]')
     if graph_format == 'adjlist':
@@ -34,18 +34,22 @@ def main():
     nu1 = 1e-5
     # nu1 is a hyperparameter in SDNE
     nu2 = 0.0001
-    # nu2 is a hyperparameter in SDNE
+    # nu2 ispi a hyperparameter in SDNE
     bs = 200
     # batch size of SDNE'
     epochs = 5
     # The training epochs of LINE and GCN
     lr = 0.01
     # learning rate
-    output = "E://PYTHONGRAM//zymNE//result//res_vec.txt"
+    output = "E://PYGRAM//zymNE//result//res_vec.txt"
+    output_cluster = "E://PYGRAM//zymNE//result//res_comms.txt"
     model = sdne.SDNE(g, encoder_layer_list=encoder_layer_list,
                       alpha=alpha, beta=beta, nu1=nu1, nu2=nu2,
                       batch_size=bs, epoch=epochs, learning_rate=lr)
+    model.k_means(5)
     model.save_embeddings(output)
+    model.save_kmeans(output_cluster)
+
 if __name__ == "__main__":
     random.seed(32)
     np.random.seed(32)
