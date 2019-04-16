@@ -72,6 +72,11 @@ class Graph(object):
         fin.close()
         self.encode_node()
 
+    def read_gml(self,filename):
+        self.G =nx.read_gml(filename)
+        for i, j in self.G.edges():
+            self.G[i][j]['weight'] = 1.0
+        self.encode_node()
 
     def read_node_label(self, filename):
         fin = open(filename, 'r')

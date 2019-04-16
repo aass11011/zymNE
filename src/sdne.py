@@ -9,8 +9,6 @@ import numpy as np
 import random
 import math
 
-__author__ = "Wang Binlu"
-__email__ = "wblmail@whu.edu.cn"
 
 
 def fc_op(input_op, name, n_out, layer_collector, act_func=tf.nn.leaky_relu):
@@ -63,12 +61,13 @@ class SDNE(object):
 
         self.adj_mat = self.getAdj()
         self.embeddings = self.train()
-
+        self.hidden_communities = {}
         ##############  k-means  ######################
 
         self.centroids = []
-        self.clusterAssment = None
-        self.communities = {}
+        self.clusterAssment = None          #第一列存储节点所属簇，第二列存储与中心点距离
+        self.original_communities = {}      #k_mean聚类结果
+        self.offcenter_communities = {}
         ##############  k-means  ######################
         look_back = self.g.look_back_list
 
@@ -169,14 +168,14 @@ class SDNE(object):
 
 
     def k_means(self,k):
-        numSamples = self.embeddings.shape[0]
-        self.clusterAssment = np.mat(np.zeros((numSamples,2),dtype = np.int))
+        node_size = self.node_size
+        self.clusterAssment = np.mat(np.zeros((node_size,2),dtype = np.int))
         clusterChange = True
         self.initCentroids(k)
         look_back = self.g.look_back_list
         while clusterChange:
             clusterChange = False
-            for i in  range(numSamples):
+            for i in  range(node_size):
                 minDist = 100000.0
                 minIndex = 0
                 for j in range(k):
@@ -194,7 +193,41 @@ class SDNE(object):
             comms = []
             for index in np.nonzero(self.clusterAssment[:,0].A == i)[0]:
                 comms.append(look_back[index])
-            self.communities[i] = comms
+            self.original_communities[i] = comms
+
+    def k_means_keep_center(self,k):
+        node_size = self.node_size
+        centroids = self.centroids
+        clusterChange = True
+        look_back = self.g.look_back_list
+        while clusterChange:
+            clusterChange =False
+            for i in  range(node_size):
+                minDist = 100000.0
+                minIndex = 0
+                for j in  range(k):
+                    distance = np.sqrt(np.sum(np.power(self.embeddings[i]-centroids[j],2)))
+                    if distance < minDist:
+                        minDist = distance
+                        minIndex = j
+                if self.clusterAssment[i,0] != minIndex:
+                    clusterChange = True
+                    self.clusterAssment[i,:] = minIndex,minDist**2
+        for i in range(k):
+            comms = []
+            for index in np.nonzero(self.clusterAssment[:, 0].A == i)[0]:
+                comms.append(look_back[index])
+            self.offcenter_communities[i] = comms
+
+
+    def weaken_community(self,weaken_rate):
+        look_back = self.g.look_back_list
+        for com,nodes in self.original_communities.items():
+            for node in nodes:
+                node_index = look_back.index(str(node))
+                cluster_index = self.clusterAssment[node_index,0]
+                diff = self.embeddings[node_index] - self.centroids[cluster_index]
+                self.embeddings[node_index] += diff * weaken_rate
     def initCentroids(self,k):
         numSample,dim = np.shape(self.embeddings)
         self.centroids = np.ones((k,dim),dtype=np.float)
@@ -202,14 +235,50 @@ class SDNE(object):
             index = int(random.uniform(0,numSample))
             self.centroids[i,:] = self.embeddings[index,:]
 
-    def save_kmeans(self,filename):
+    def save_comms(self,filename,type="original"):
         fout = open(filename,'w')
-        clusters = self.communities
+        if type == "original":
+            clusters = self.original_communities
+        elif type == "offcenter":
+            clusters = self.offcenter_communities
         fout.write("number of clusters:{} \n".format(len(clusters)))
         for com,nodes in clusters.items():
             fout.write("{} {}\n".format(com,' '.join([str(x) for x in nodes])))
         fout.close()
+    def save_node_cluster(self,filename):
+        fout = open(filename,"w")
+        look_back = self.g.look_back_list
+        fout.write("{} {}\n".format(look_back[i],self.clusterAssment[i,0]) for i in range(len(self.embeddings)))
+        fout.close()
 
+    def save_centroids(self,filename):
+        fout = open(filename,"w")
+        for i,centroid in enumerate(self.centroids):
+            fout.writelines("{} {}".format(i,centroid))
+        fout.close()
+
+    def communities_detection(self,path,weakening_rate):
+        original = self.original_communities
+        offcenter =  self.offcenter_communities
+        hidden = self.hidden_communities
+        comm_out = set()
+        comm_in = set()
+        for (k1,comm_or) in original.items():
+            for (k2,comm_of) in offcenter.items():
+                if k1 == k2:
+                    comm_out = set(comm_or)-set(comm_of) #comm_out 从原先社区中分离的
+                    comm_in = set(comm_of)-set(comm_or)  #comm_in  新加入原先社区的
+                    continue
+                elif k1 > k2:
+                    continue
+                else:
+                    hidden[str(k1)+str(k2)] = (comm_out & set(comm_of)) | (comm_in & set(comm_or))
+                    #(comm_out & comm_of) 从原先社区中分离出来后进入当前（k2）社区的
+                    #(comm_in & comm_or) 新加入原先社区的节点中有原来社区的
+        filename = "hidden_comms_.txt".format(str(weakening_rate).replace('.','_'))
+        fout = open(path.format(filename),"w")
+        for com,nodes in hidden.items():
+            fout.write("{} {}\n".format(com,' '.join([str(x) for x in nodes])))
 
 class SDNE2(object):
     def __init__(self, graph, encoder_layer_list, alpha=1e-6, beta=5., nu1=1e-5, nu2=1e-5,
