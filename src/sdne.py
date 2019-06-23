@@ -62,6 +62,8 @@ class SDNE(object):
         self.adj_mat = self.getAdj()
         self.embeddings = self.train()
         self.hidden_communities = {}
+        '''
+        
         ##############  k-means  ######################
 
         self.centroids = []
@@ -69,6 +71,11 @@ class SDNE(object):
         self.original_communities = {}      #k_mean聚类结果
         self.offcenter_communities = {}
         ##############  k-means  ######################
+        '''
+        '''
+        embedding 和look back的顺序是一致的
+        vector是一个字典 k：node v：embedding
+        '''
         look_back = self.g.look_back_list
 
         for i, embedding in enumerate(self.embeddings):
@@ -166,6 +173,8 @@ class SDNE(object):
             fout.write("{} {}\n".format(node, ' '.join([str(x) for x in vec])))
         fout.close()
 
+    '''
+    
 
     def k_means(self,k):
         node_size = self.node_size
@@ -235,6 +244,7 @@ class SDNE(object):
             index = int(random.uniform(0,numSample))
             self.centroids[i,:] = self.embeddings[index,:]
 
+    '''
     def save_comms(self,filename,type="original"):
         fout = open(filename,'w')
         if type == "original":
@@ -256,7 +266,8 @@ class SDNE(object):
         for i,centroid in enumerate(self.centroids):
             fout.writelines("{} {}".format(i,centroid))
         fout.close()
-
+    '''
+    
     def communities_detection(self,path,weakening_rate):
         original = self.original_communities
         offcenter =  self.offcenter_communities
@@ -279,7 +290,7 @@ class SDNE(object):
         fout = open(path.format(filename),"w")
         for com,nodes in hidden.items():
             fout.write("{} {}\n".format(com,' '.join([str(x) for x in nodes])))
-
+    '''
 class SDNE2(object):
     def __init__(self, graph, encoder_layer_list, alpha=1e-6, beta=5., nu1=1e-5, nu2=1e-5,
                  batch_size=100, max_iter=2000, learning_rate=None):

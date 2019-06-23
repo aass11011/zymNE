@@ -20,8 +20,8 @@ class Graph(object):
         look_up = self.look_up_dict
         look_back = self.look_back_list
         for node in self.G.nodes():
-            look_up[node] = self.node_size
-            look_back.append(node)
+            look_up[node] = self.node_size   #look_up_dict  k: node v:读入顺序
+            look_back.append(node)             #look_back_list 节点的读入顺序list
             self.node_size += 1
             self.G.nodes[node]['status'] = ''
 
@@ -77,7 +77,18 @@ class Graph(object):
         for i, j in self.G.edges():
             self.G[i][j]['weight'] = 1.0
         self.encode_node()
-
+    def read_csv(self,filename):
+        self.G = nx.DiGraph()
+        fin = open(filename,'r')
+        for l in fin.readlines():
+            if l=='':
+                break
+            src,dst = l.strip().split(',')
+            self.G.add_edge(src, dst)
+            self.G.add_edge(dst, src)
+            self.G[src][dst]['weight'] = 1.0
+            self.G[dst][src]['weight'] = 1.0
+        self.encode_node()
     def read_node_label(self, filename):
         fin = open(filename, 'r')
         while 1:
@@ -116,3 +127,18 @@ class Graph(object):
             vec = l.split()
             self.G[vec[0]][vec[1]]['label'] = vec[2:]
         fin.close()
+
+    def read_groundtruth(self,filename):
+        # groundtruth  k: node v:true_label
+        groundtruth = {}
+        fin = open(filename,'r')
+        label = 0
+        while 1:
+            l = fin.readline()
+            if l == '':
+                break
+            vec = l
+            for i in vec:
+                groundtruth.update({i:label})
+            label += 1
+        return  groundtruth
